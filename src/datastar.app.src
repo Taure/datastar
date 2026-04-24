@@ -1,0 +1,17 @@
+{application, datastar, [
+    {description,
+        "Erlang SDK for the Datastar hypermedia framework (SSE event builder and signal reader, zero deps)."},
+    {vsn, "git"},
+    {registered, []},
+    {applications, [
+        kernel,
+        stdlib
+    ]},
+    {env, []},
+    {modules, []},
+    {licenses, ["Apache-2.0"]},
+    {links, [
+        {"GitHub", "https://github.com/Taure/datastar"},
+        {"Datastar", "https://data-star.dev"}
+    ]}
+]}.
