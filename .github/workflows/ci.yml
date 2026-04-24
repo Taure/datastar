@@ -19,7 +19,6 @@ jobs:
       enable-audit: true
       enable-sbom: true
       enable-sbom-scan: true
-      enable-dependency-submission: true
       enable-elp-lint: true
       enable-elp-eqwalize: true
       enable-summary: true
