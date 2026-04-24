@@ -87,11 +87,8 @@ plugin is planned as a separate library.
 
 ## Module layout
 
-| Module              | Purpose                                           |
-|---------------------|---------------------------------------------------|
-| `datastar`          | Facade — use this module for everything.          |
-| `datastar_sse`      | Pure iodata event builders (v1 wire format).      |
-| `datastar_signals`  | Decode signal payloads from requests.             |
+One module, `datastar` — everything (event builders, headers, signal
+reader) lives there.
 
 ## Protocol coverage
 
