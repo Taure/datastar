@@ -18,12 +18,12 @@ Add to `rebar.config`:
 
 ```erlang
 {deps, [
-    {datastar, {git, "https://github.com/Taure/datastar.git", {tag, "vX.Y.Z"}}}
+    {datastar, {git, "https://github.com/Taure/datastar.git", {tag, "v0.1.0"}}}
 ]}.
 ```
 
-`vX.Y.Z` is a placeholder. Put the release you want in its place; the
-releases are listed in [CHANGELOG.md](CHANGELOG.md).
+The releases are listed in [CHANGELOG.md](CHANGELOG.md). `datastar` is not
+on Hex: the package of that name there is another project.
 
 Requires OTP 28 or later.
 

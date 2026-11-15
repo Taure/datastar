@@ -2,9 +2,9 @@
 
 Changes to `datastar` that a caller can notice.
 
-## Unreleased
+## 0.1.0
 
-Compared with the previous, untagged `main`.
+The first tagged release. Compared with the untagged `main` before it.
 
 ### Breaking changes
 
