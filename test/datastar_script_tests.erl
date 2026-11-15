@@ -115,6 +115,47 @@ attribute_name_with_a_line_break_is_refused_test() ->
         ]
     ).
 
+script_with_its_own_closing_tag_is_refused_test() ->
+    Scripts = [
+        ~"</script>",
+        ~"a()</script>b()",
+        ~"a('</SCRIPT>')",
+        ~"a('</ScRiPt >')",
+        ~"a()</script",
+        ~"</script\n>",
+        [~"a('</scr", ~"ipt>')"],
+        [~"a(", json:encode(#{~"n" => ~"</script>"}), ~")"]
+    ],
+    ?assertEqual(
+        [],
+        [
+            Script
+         || Script <- Scripts,
+            Opts <- [#{}, #{auto_remove => false, attributes => [{~"nonce", ~"n"}]}],
+            raised(Script, Opts) =/= {invalid_argument, script, closing_tag}
+        ]
+    ).
+
+script_without_a_closing_tag_is_written_as_given_test() ->
+    Scripts = [
+        ~"a<b",
+        ~"a</scrip",
+        ~"a('</ script>')",
+        ~"a('<script>')",
+        ~"a('<\\/script>')",
+        ~"a('</div>')",
+        ~"a < /script/.exec(b)"
+    ],
+    ?assertEqual(
+        [],
+        [
+            Script
+         || Script <- Scripts,
+            element(datastar:execute_script(Script, #{auto_remove => false})) =/=
+                <<"<script>", Script/binary, "</script>">>
+        ]
+    ).
+
 element(Event) ->
     [#{data := Data}] = datastar_test_sse:events(Event),
     #{~"elements" := Element} = datastar_test_sse:fields(Data),

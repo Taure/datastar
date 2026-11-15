@@ -184,6 +184,9 @@ names you chose yourself, and only trusted values to such attributes.
 
 `Script` is written into the element as given, without HTML escaping.
 Line breaks in it are framed the way `patch_elements/2` frames `Html`.
+A `Script` that contains `</script`, in any letter case, is refused
+with `error({invalid_argument, script, closing_tag})`, because the
+element would end there. Inside a JavaScript string, write `<\/script`.
 """.
 -spec execute_script(iodata(), execute_script_opts()) -> iodata().
 execute_script(Script, Opts) ->
@@ -340,7 +343,14 @@ build_script_element(Script, AutoRemove, Attrs) ->
         [$\s, attribute_name(Name), ~"=\"", attribute_value(Value), $"]
      || {Name, Value} <- Attrs
     ],
-    [~"<script", TypeAttr, AutoAttr, CustomAttrs, $>, Script, ~"</script>"].
+    [~"<script", TypeAttr, AutoAttr, CustomAttrs, $>, script_body(Script), ~"</script>"].
+
+script_body(Script) ->
+    Bin = iolist_to_binary(Script),
+    case re:run(Bin, ~"</script", [caseless, {capture, none}]) of
+        nomatch -> Bin;
+        match -> error({invalid_argument, script, closing_tag})
+    end.
 
 attribute_name(Name) ->
     Bin = iolist_to_binary(Name),
