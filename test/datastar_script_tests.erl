@@ -19,7 +19,7 @@ attribute_value_given_as_iodata_is_escaped_test() ->
         ~"<script type=\"application/javascript\" nonce=\"a&quot;b\">x()</script>",
         element(
             datastar:execute_script(~"x()", #{
-                auto_remove => false, attributes => [{[~"non", "ce"], [~"a", [$" | ~"b"]]}]
+                auto_remove => false, attributes => [{[~"non", "ce"], [~"a", [$", ~"b"]]}]
             })
         )
     ).

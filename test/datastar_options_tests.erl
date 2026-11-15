@@ -6,17 +6,23 @@
 
 patch_elements_refuses_a_line_break_in_an_option_test() ->
     Cases = [
-        {Option, Text}
-     || Option <- [selector, mode, namespace, id], Text <- datastar_test_sse:texts()
+        {Option, Reason, Text}
+     || {Option, Reason} <- [
+            {selector, line_break},
+            {id, line_break},
+            {mode, unknown_mode},
+            {namespace, unknown_namespace}
+        ],
+        Text <- datastar_test_sse:texts()
     ],
     ?assertEqual(4 * ?TEXTS, length(Cases)),
     ?assertEqual(
         [],
         [
             Case
-         || {Option, Text} = Case <- Cases,
+         || {Option, Reason, Text} = Case <- Cases,
             raised(patch_elements, [~"<p></p>", #{Option => Text}]) =/=
-                {invalid_option, Option, line_break}
+                {invalid_option, Option, Reason}
         ]
     ).
 
@@ -55,8 +61,13 @@ remove_elements_refuses_a_line_break_in_its_selector_test() ->
 
 nul_is_refused_in_an_option_test() ->
     Cases = [
-        {Option, Text}
-     || Option <- [selector, mode, namespace, id],
+        {Option, Reason, Text}
+     || {Option, Reason} <- [
+            {selector, nul},
+            {id, nul},
+            {mode, unknown_mode},
+            {namespace, unknown_namespace}
+        ],
         Text <- [<<0>>, <<"a", 0>>, <<0, "a">>, <<"a", 0, "b">>]
     ],
     ?assertEqual(16, length(Cases)),
@@ -64,9 +75,35 @@ nul_is_refused_in_an_option_test() ->
         [],
         [
             Case
-         || {Option, Text} = Case <- Cases,
+         || {Option, Reason, Text} = Case <- Cases,
             raised(patch_elements, [~"<p></p>", #{Option => Text}]) =/=
-                {invalid_option, Option, nul}
+                {invalid_option, Option, Reason}
+        ]
+    ).
+
+every_mode_and_namespace_is_written_test() ->
+    Modes = [outer, inner, replace, prepend, append, before, 'after', remove],
+    Namespaces = [html, svg, mathml],
+    ?assertEqual(
+        [],
+        [
+            {Mode, Namespace}
+         || Mode <- Modes ++ [atom_to_binary(Mode) || Mode <- Modes],
+            Namespace <- Namespaces ++ [atom_to_binary(Namespace) || Namespace <- Namespaces],
+            Event <- [datastar:patch_elements(~"<p></p>", #{mode => Mode, namespace => Namespace})],
+            fields(Event) =/=
+                maps:merge(
+                    #{~"elements" => ~"<p></p>"},
+                    maps:from_list(
+                        [{~"mode", Mode} || is_binary(Mode)] ++
+                            [{~"mode", atom_to_binary(Mode)} || is_atom(Mode), Mode =/= outer] ++
+                            [{~"namespace", Namespace} || is_binary(Namespace)] ++
+                            [
+                                {~"namespace", atom_to_binary(Namespace)}
+                             || is_atom(Namespace), Namespace =/= html
+                            ]
+                    )
+                )
         ]
     ).
 
@@ -116,9 +153,8 @@ every_printable_ascii_character_is_kept_in_id_test() ->
     ?assertEqual(
         [[<<"x", Id/binary>>] || _Builder <- builders()],
         [
-            [EventId || #{id := EventId} <- datastar_test_sse:events(Event)]
-         || {Function, Args} <- builders(),
-            Event <- [apply(datastar, Function, Args ++ [#{id => [~"x", Id]}])]
+            [EventId || #{id := EventId} <- Events]
+         || Events <- events_of_every_builder(#{id => [~"x", Id]})
         ]
     ).
 
@@ -158,9 +194,8 @@ largest_retry_is_written_test() ->
     ?assertEqual(
         [[2147483647] || _Builder <- builders()],
         [
-            [Retry || #{retry := Retry} <- datastar_test_sse:events(Event)]
-         || {Function, Args} <- builders(),
-            Event <- [apply(datastar, Function, Args ++ [#{retry => 2147483647}])]
+            [Retry || #{retry := Retry} <- Events]
+         || Events <- events_of_every_builder(#{retry => 2147483647})
         ]
     ).
 
@@ -207,6 +242,22 @@ option_given_as_iodata_is_checked_too_test() ->
             ~"data: selector #a b\n"
         )
     ).
+
+fields(Event) ->
+    [#{data := Data}] = datastar_test_sse:events(Event),
+    datastar_test_sse:fields(Data).
+
+events_of_every_builder(Opts) ->
+    [
+        datastar_test_sse:events(Event)
+     || Event <- [
+            datastar:patch_elements(~"<p></p>", Opts),
+            datastar:patch_signals(#{~"a" => 1}, Opts),
+            datastar:execute_script(~"x()", Opts),
+            datastar:remove_elements(~"#gone", Opts),
+            datastar:remove_signals([~"a"], Opts)
+        ]
+    ].
 
 builders() ->
     [
