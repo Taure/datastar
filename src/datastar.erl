@@ -332,6 +332,9 @@ and sends it as a `datastar-patch-signals` event.
 
     datastar:remove_signals([~"user.name", ~"cart"]).
 
+A path under a path that is removed as a whole adds nothing:
+`[~"user", ~"user.name"]` removes `user`.
+
 Options: as in `patch_signals/2`.
 
 Raises:
@@ -585,4 +588,8 @@ null_merge(_Other, _Merge) ->
 put_null([Key], Merge) ->
     Merge#{Key => null};
 put_null([Key | Rest], Merge) ->
-    Merge#{Key => put_null(Rest, maps:get(Key, Merge, #{}))}.
+    case Merge of
+        #{Key := null} -> Merge;
+        #{Key := Inner} -> Merge#{Key => put_null(Rest, Inner)};
+        #{} -> Merge#{Key => put_null(Rest, #{})}
+    end.
