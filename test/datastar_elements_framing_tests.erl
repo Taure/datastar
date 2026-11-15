@@ -73,35 +73,6 @@ execute_script_is_one_event_for_any_line_ending_test() ->
         ]
     ).
 
-execute_script_attributes_are_one_event_for_any_line_ending_test() ->
-    Texts = datastar_test_sse:texts(),
-    ?assertEqual(?TEXTS, length(Texts)),
-    ?assertEqual(
-        [],
-        [
-            Text
-         || Text <- Texts,
-            received(
-                datastar:execute_script(~"x()", #{
-                    auto_remove => false, attributes => [{Text, Text}]
-                })
-            ) =/=
-                [
-                    {?ELEMENTS, #{
-                        ~"selector" => ~"body",
-                        ~"mode" => ~"append",
-                        ~"elements" => datastar_test_sse:as_received([
-                            ~"<script type=\"application/javascript\" ",
-                            Text,
-                            ~"=\"",
-                            Text,
-                            ~"\">x()</script>"
-                        ])
-                    }}
-                ]
-        ]
-    ).
-
 crlf_is_one_line_break_test() ->
     ?assertEqual(
         ~"event: datastar-patch-elements\ndata: elements a\ndata: elements b\n\n",

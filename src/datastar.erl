@@ -69,7 +69,7 @@ compile down to these two events as ergonomic sugar.
 
 -type execute_script_opts() :: #{
     auto_remove => boolean(),
-    attributes => [{binary(), binary()}],
+    attributes => [{Name :: iodata(), Value :: iodata()}],
     id => iodata(),
     retry => non_neg_integer()
 }.
@@ -171,9 +171,19 @@ Compiles to `patch_elements/2` with `selector => ~"body"` and
 Options: `auto_remove` (default `true`, adds `data-effect="el.remove()"`),
 `attributes` (extra `[{Name, Value}]`), plus standard SSE `id` / `retry`.
 
-`Script` and the attribute names and values are written into the
-element as given, without HTML escaping. Line breaks in them are framed
-the way `patch_elements/2` frames `Html`.
+An attribute value is escaped for a double-quoted HTML attribute (`&`,
+`"`, `'`, `<` and `>`). An attribute name is written as given and must
+be a plain HTML attribute name: not empty, valid UTF-8, and without
+whitespace, control characters, `"`, `'`, `>`, `/` or `=`. Any other
+name is refused with `error({invalid_option, attributes, invalid_name})`.
+
+Escaping keeps a value inside its attribute. It does not make untrusted
+text safe in an attribute whose value is code or a URL to load code
+from, such as `src`, `on*` or a Datastar `data-*` expression: pass only
+names you chose yourself, and only trusted values to such attributes.
+
+`Script` is written into the element as given, without HTML escaping.
+Line breaks in it are framed the way `patch_elements/2` frames `Html`.
 """.
 -spec execute_script(iodata(), execute_script_opts()) -> iodata().
 execute_script(Script, Opts) ->
@@ -326,8 +336,43 @@ build_script_element(Script, AutoRemove, Attrs) ->
             true -> ~" data-effect=\"el.remove()\"";
             false -> []
         end,
-    CustomAttrs = [[$\s, K, ~"=\"", V, ~"\""] || {K, V} <- Attrs],
+    CustomAttrs = [
+        [$\s, attribute_name(Name), ~"=\"", attribute_value(Value), $"]
+     || {Name, Value} <- Attrs
+    ],
     [~"<script", TypeAttr, AutoAttr, CustomAttrs, $>, Script, ~"</script>"].
+
+attribute_name(Name) ->
+    Bin = iolist_to_binary(Name),
+    case Bin =/= ~"" andalso plain_attribute_name(Bin) of
+        true -> Bin;
+        false -> error({invalid_option, attributes, invalid_name})
+    end.
+
+plain_attribute_name(<<>>) ->
+    true;
+plain_attribute_name(<<Char/utf8, Rest/binary>>) when
+    Char > $\s,
+    Char < 16#7F orelse Char > 16#9F,
+    Char =/= $",
+    Char =/= $',
+    Char =/= $>,
+    Char =/= $/,
+    Char =/= $=
+->
+    plain_attribute_name(Rest);
+plain_attribute_name(_Other) ->
+    false.
+
+attribute_value(Value) ->
+    <<<<(escaped(Byte))/binary>> || <<Byte>> <= iolist_to_binary(Value)>>.
+
+escaped($&) -> ~"&amp;";
+escaped($") -> ~"&quot;";
+escaped($') -> ~"&#39;";
+escaped($<) -> ~"&lt;";
+escaped($>) -> ~"&gt;";
+escaped(Byte) -> <<Byte>>.
 
 build_null_merge(Paths) ->
     build_null_merge(Paths, #{}).
