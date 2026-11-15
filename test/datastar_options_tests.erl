@@ -138,6 +138,32 @@ retry_is_a_non_negative_integer_test() ->
         ]
     ).
 
+retry_above_the_largest_timer_delay_is_refused_test() ->
+    Cases = [
+        {Function, Args ++ [#{retry => Retry}]}
+     || Retry <- [2147483648, 1 bsl 32, 1 bsl 100],
+        {Function, Args} <- builders()
+    ],
+    ?assertEqual(15, length(Cases)),
+    ?assertEqual(
+        [],
+        [
+            Case
+         || {Function, Args} = Case <- Cases,
+            raised(Function, Args) =/= {invalid_option, retry, too_large}
+        ]
+    ).
+
+largest_retry_is_written_test() ->
+    ?assertEqual(
+        [[2147483647] || _Builder <- builders()],
+        [
+            [Retry || #{retry := Retry} <- datastar_test_sse:events(Event)]
+         || {Function, Args} <- builders(),
+            Event <- [apply(datastar, Function, Args ++ [#{retry => 2147483647}])]
+        ]
+    ).
+
 single_line_options_arrive_as_given_test() ->
     Opts = #{
         selector => ~"#list > li.done, [data-x=\"a b\"]",

@@ -47,6 +47,7 @@ compile down to these two events as ergonomic sugar.
 
 -define(EVT_PATCH_ELEMENTS, ~"datastar-patch-elements").
 -define(EVT_PATCH_SIGNALS, ~"datastar-patch-signals").
+-define(MAX_RETRY, 2147483647).
 
 -type mode() ::
     outer | inner | replace | prepend | append | before | 'after' | remove | binary().
@@ -115,6 +116,11 @@ is not a non-negative integer with
 holds for these options in every other function of this module. NUL is
 refused because a client drops an `id` that contains one; in `Html` it
 is passed through.
+
+`retry` is a number of milliseconds and may be at most 2147483647
+(2^31 - 1, a little under 25 days), the longest delay a browser timer
+takes. A larger integer is refused with
+`error({invalid_option, retry, too_large})`.
 
 A client sends the last `id` it received back in a request header when
 it reconnects, so an `id` must be printable ASCII (`16#20` to `16#7E`).
@@ -295,9 +301,14 @@ refused_in_id(<<Byte, _/binary>>) when Byte =:= $\r; Byte =:= $\n -> line_break;
 refused_in_id(<<0, _/binary>>) -> nul;
 refused_in_id(_Other) -> not_printable_ascii.
 
-retry_line(undefined) -> [];
-retry_line(Retry) when is_integer(Retry), Retry >= 0 -> [~"retry: ", integer_to_binary(Retry), $\n];
-retry_line(_Retry) -> error({invalid_option, retry, not_a_non_negative_integer}).
+retry_line(undefined) ->
+    [];
+retry_line(Retry) when is_integer(Retry), Retry >= 0, Retry =< ?MAX_RETRY ->
+    [~"retry: ", integer_to_binary(Retry), $\n];
+retry_line(Retry) when is_integer(Retry), Retry > ?MAX_RETRY ->
+    error({invalid_option, retry, too_large});
+retry_line(_Retry) ->
+    error({invalid_option, retry, not_a_non_negative_integer}).
 
 patch_elements_option_lines(Opts) ->
     [
