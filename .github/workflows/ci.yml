@@ -4,21 +4,34 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
 
 jobs:
   ci:
-    uses: Taure/erlang-ci/.github/workflows/ci.yml@v2
+    uses: Taure/erlang-ci/.github/workflows/ci.yml@v2.3.2
     permissions:
       contents: write
       pull-requests: write
-    secrets: inherit
     with:
-      otp-version: '28'
-      rebar3-version: '3.27.0'
+      version-file: '.tool-versions'
+      otp-matrix: '["28", "29"]'
       enable-ex-doc: true
-      enable-audit: true
+      enable-hank: true
+      enable-audit: false
+      enable-coverage: true
       enable-sbom: true
       enable-sbom-scan: true
+      enable-dependency-submission: true
       enable-elp-lint: true
       enable-elp-eqwalize: true
       enable-summary: true
+      enable-mutate: true
+      mutate-min-score: '85'
+      mutate-args: '--timeout 20000'
+
+  release:
+    needs: ci
+    if: ${{ github.event_name == 'push' }}
+    uses: Taure/erlang-ci/.github/workflows/release.yml@v2.3.2
+    permissions:
+      contents: write

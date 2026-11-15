@@ -128,6 +128,13 @@ remove_elements_test() ->
     ?assertMatch({_, _}, binary:match(Out, ~"data: mode remove")),
     ?assertEqual(nomatch, binary:match(Out, ~"data: elements")).
 
+remove_elements_accepts_an_iodata_selector_test() ->
+    Expected = ~"event: datastar-patch-elements\ndata: selector #banner\ndata: mode remove\n\n",
+    ?assertEqual(Expected, iolist_to_binary(datastar:remove_elements("#banner"))),
+    ?assertEqual(
+        Expected, iolist_to_binary(datastar:remove_elements([~"#", "ban", [~"ner"]], #{}))
+    ).
+
 %% -- remove_signals -----------------------------------------------------------
 
 remove_signals_flat_test() ->
@@ -141,6 +148,17 @@ remove_signals_nested_test() ->
     ?assertMatch({_, _}, binary:match(Out, ~"\"user\":")),
     ?assertMatch({_, _}, binary:match(Out, ~"\"name\":null")),
     ?assertMatch({_, _}, binary:match(Out, ~"\"email\":null")).
+
+remove_signals_under_a_removed_path_test() ->
+    ?assertEqual(
+        [#{~"a" => null, ~"b" => #{~"c" => null}}, #{~"a" => null}, #{~"a" => null}],
+        [
+            json:decode(Signals)
+         || Paths <- [[~"a", ~"a.b", ~"b.c"], [~"a.b", ~"a"], [~"a", ~"a.b.c"]],
+            #{data := <<"signals ", Signals/binary>>} <-
+                datastar_test_sse:events(datastar:remove_signals(Paths))
+        ]
+    ).
 
 %% -- framing sanity -----------------------------------------------------------
 
