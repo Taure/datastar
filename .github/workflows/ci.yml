@@ -14,6 +14,7 @@ jobs:
     secrets: inherit
     with:
       otp-version: '28'
+      otp-matrix: '["28", "29"]'
       rebar3-version: '3.27.0'
       enable-ex-doc: true
       enable-audit: true
