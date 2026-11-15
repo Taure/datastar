@@ -57,20 +57,25 @@ random_calls_without_a_carriage_return_are_written_as_before_test_() ->
         )
     end}.
 
-random_calls_are_both_accepted_and_refused_test() ->
-    Outcomes = [Outcome || Call <- calls(), {Outcome, _} <- [datastar_test_model:expected(Call)]],
-    Accepted = length([accepted || events <- Outcomes]),
-    Refused = length([refused || raises <- Outcomes]),
-    case os:getenv("DATASTAR_PROPERTY_CASES") of
-        false ->
-            ok;
-        _Set ->
-            io:format(user, "~n~b calls: ~b accepted, ~b refused~n", [
-                length(Outcomes), Accepted, Refused
-            ])
-    end,
-    ?assert(Accepted * 4 > length(Outcomes)),
-    ?assert(Refused * 4 > length(Outcomes)).
+random_calls_are_both_accepted_and_refused_test_() ->
+    {timeout, 3600, fun() ->
+        Outcomes = [
+            Outcome
+         || Call <- calls(), {Outcome, _} <- [datastar_test_model:expected(Call)]
+        ],
+        Accepted = length([accepted || events <- Outcomes]),
+        Refused = length([refused || raises <- Outcomes]),
+        case os:getenv("DATASTAR_PROPERTY_CASES") of
+            false ->
+                ok;
+            _Set ->
+                io:format(user, "~n~b calls: ~b accepted, ~b refused~n", [
+                    length(Outcomes), Accepted, Refused
+                ])
+        end,
+        ?assert(Accepted * 4 > length(Outcomes)),
+        ?assert(Refused * 4 > length(Outcomes))
+    end}.
 
 calls() ->
     Cases = list_to_integer(os:getenv("DATASTAR_PROPERTY_CASES", ?DEFAULT_CASES)),
