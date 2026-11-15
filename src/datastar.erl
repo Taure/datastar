@@ -100,8 +100,9 @@ patch_elements(Html) ->
 -doc """
 Build a `datastar-patch-elements` event that morphs `Html` into the DOM.
 
-HTML containing newlines is split into one `data: elements <line>` per
-line, as required by SSE framing.
+`Html` is split into one `data: elements <line>` per line, as required
+by SSE framing. A line ends at `\r\n`, `\r` or `\n`, which is where an
+SSE client ends it, so the client receives every line break as `\n`.
 
 Options: `selector`, `mode` (default `outer`), `use_view_transition`,
 `namespace` (default `html`), plus standard SSE `id` / `retry`.
@@ -265,7 +266,18 @@ patch_signals_option_lines(Opts) ->
 elements_data_lines(Html) ->
     case iolist_to_binary(Html) of
         <<>> -> [];
-        Bin -> [[~"data: elements ", Line, $\n] || Line <- binary:split(Bin, ~"\n", [global])]
+        Bin -> data_lines(~"data: elements ", Bin)
+    end.
+
+data_lines(Prefix, Bin) ->
+    [[Prefix, Line, $\n] || Line <- lines(Bin)].
+
+%% A single-pattern split is several times faster than a three-pattern one,
+%% and text without a carriage return is the common case.
+lines(Bin) ->
+    case binary:match(Bin, ~"\r") of
+        nomatch -> binary:split(Bin, ~"\n", [global]);
+        _ -> binary:split(Bin, [~"\r\n", ~"\r", ~"\n"], [global])
     end.
 
 build_script_element(Script, AutoRemove, Attrs) ->
