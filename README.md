@@ -104,6 +104,43 @@ All `data:`-level fields from the v1 spec are supported: `selector`,
 `mode`, `useViewTransition`, `namespace`, `onlyIfMissing`, `signals`,
 `elements`, plus the standard SSE `id` and `retry` fields.
 
+## Line endings and option values
+
+An SSE client ends a line at `\r\n`, `\r` or `\n`. The builders follow the
+same rule:
+
+| Input | What happens to `\r`, `\n`, `\r\n` |
+|-------|-----------------------------------|
+| `Html` of `patch_elements/1,2`, `Script` and `attributes` of `execute_script/1,2` | Each one ends a line. Every line gets its own `data: elements` prefix. The client receives the break as `\n`. |
+| Pre-encoded JSON of `patch_signals/1,2` | Same, with a `data: signals` prefix. |
+| A map given to `patch_signals/1,2`, the paths of `remove_signals/1,2` | Encoded by `json`, which escapes every control character, so the value is one line. |
+| `selector`, `mode`, `namespace`, `id` | Refused: `error({invalid_option, Option, line_break})`. |
+| `retry` | Must be a non-negative integer: `error({invalid_option, retry, not_a_non_negative_integer})`. |
+
+A NUL byte in `selector`, `mode`, `namespace` or `id` is refused too
+(`error({invalid_option, Option, nul})`), because a client drops an `id`
+that contains one. In HTML, scripts and pre-encoded JSON it is passed
+through unchanged; in a map it is escaped as `\u0000`. U+2028 and U+2029
+are not line breaks in SSE and are sent as the UTF-8 text they are.
+
+The builders do not escape HTML. `execute_script/2` writes the script
+body and the attribute names and values as given.
+
+## Upgrading
+
+Changes after `fcc11f3` that a caller can notice:
+
+- A carriage return in streamed HTML, in a script or in pre-encoded
+  signals JSON is now a line break, as `\n` already was. `\r\n` counts
+  once. The browser receives `\n` in its place.
+- Pre-encoded signals JSON that spans several lines is now sent as
+  several `data: signals` lines and arrives whole.
+- `selector`, `mode`, `namespace` and `id` values containing `\r`, `\n`
+  or NUL raise `{invalid_option, Option, line_break | nul}` instead of
+  being written. Validate or strip such values before passing them.
+- `retry` raises `{invalid_option, retry, not_a_non_negative_integer}`
+  for anything but a non-negative integer.
+
 ## License
 
 Apache-2.0.
