@@ -129,6 +129,11 @@ Patch to the client signal store.
 `Signals` may be a map (encoded via OTP's `json`) or pre-encoded JSON
 iodata.
 
+A map is written on one line: `json` escapes every control character,
+`\r` and `\n` included. Pre-encoded JSON is split into one
+`data: signals <line>` per line the same way `patch_elements/2` splits
+HTML, so JSON that was pretty-printed arrives whole.
+
 Options: `only_if_missing`, plus standard SSE `id` / `retry`.
 """.
 -spec patch_signals(map() | iodata(), patch_signals_opts()) -> iodata().
@@ -139,7 +144,7 @@ patch_signals(Json, Opts) ->
         event_line(?EVT_PATCH_SIGNALS),
         sse_meta_lines(Opts),
         patch_signals_option_lines(Opts),
-        [~"data: signals ", Json, $\n],
+        data_lines(~"data: signals ", iolist_to_binary(Json)),
         $\n
     ].
 
