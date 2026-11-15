@@ -128,6 +128,13 @@ remove_elements_test() ->
     ?assertMatch({_, _}, binary:match(Out, ~"data: mode remove")),
     ?assertEqual(nomatch, binary:match(Out, ~"data: elements")).
 
+remove_elements_accepts_an_iodata_selector_test() ->
+    Expected = ~"event: datastar-patch-elements\ndata: selector #banner\ndata: mode remove\n\n",
+    ?assertEqual(Expected, iolist_to_binary(datastar:remove_elements("#banner"))),
+    ?assertEqual(
+        Expected, iolist_to_binary(datastar:remove_elements([~"#", "ban", [~"ner"]], #{}))
+    ).
+
 %% -- remove_signals -----------------------------------------------------------
 
 remove_signals_flat_test() ->

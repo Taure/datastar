@@ -300,7 +300,7 @@ execute_script(Script, Opts) ->
     patch_elements(Element, PatchOpts#{selector => ~"body", mode => append}).
 
 -doc #{equiv => remove_elements(Selector, #{})}.
--spec remove_elements(binary()) -> iodata().
+-spec remove_elements(iodata()) -> iodata().
 remove_elements(Selector) ->
     remove_elements(Selector, #{}).
 
@@ -313,7 +313,7 @@ checked the same way. `Opts` takes the options of `patch_elements/2`;
 
 Raises the option errors of `patch_elements/2`.
 """.
--spec remove_elements(binary(), patch_elements_opts()) -> iodata().
+-spec remove_elements(iodata(), patch_elements_opts()) -> iodata().
 remove_elements(Selector, Opts) when is_map(Opts) ->
     patch_elements(~"", Opts#{selector => Selector, mode => remove});
 remove_elements(_Selector, _Opts) ->
