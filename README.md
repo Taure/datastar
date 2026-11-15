@@ -5,7 +5,7 @@ that collapses HTMX + Alpine into a single `data-*` vocabulary with SSE as
 a first-class transport.
 
 - **Pure Erlang, zero runtime deps.** Uses OTP's built-in `json` module
-  (OTP 27+) and nothing else.
+  and nothing else.
 - **Framework-agnostic.** Returns `iodata()`. Plug into Cowboy, Nova, or
   anything else that can stream chunked HTTP.
 - **v1 protocol.** Targets Datastar SDK v1 (`datastar-patch-elements`,
@@ -22,7 +22,7 @@ Add to `rebar.config`:
 ]}.
 ```
 
-Requires OTP 27+ (for the built-in `json` module).
+Requires OTP 28 or later.
 
 ## Quickstart
 
