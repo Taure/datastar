@@ -225,23 +225,24 @@ Raises:
 """.
 -spec patch_signals(map() | iodata(), patch_signals_opts()) -> iodata().
 patch_signals(Signals, Opts) when is_map(Signals) ->
-    signals_event(encoded(Signals, signals), Opts);
+    signals_event(encoded_line(Signals, signals), Opts);
 patch_signals(Json, Opts) ->
-    signals_event(json_text(to_binary(Json, {invalid_argument, signals, not_iodata})), Opts).
+    Text = json_text(to_binary(Json, {invalid_argument, signals, not_iodata})),
+    signals_event(data_lines(~"data: signals ", Text), Opts).
 
-signals_event(Json, Opts) ->
+signals_event(DataLines, Opts) ->
     known_options(Opts, [only_if_missing, id, retry]),
     [
         event_line(?EVT_PATCH_SIGNALS),
         sse_meta_lines(Opts),
         patch_signals_option_lines(Opts),
-        data_lines(~"data: signals ", Json),
+        DataLines,
         $\n
     ].
 
-encoded(Map, Argument) ->
+encoded_line(Map, Argument) ->
     try
-        iolist_to_binary(json:encode(Map))
+        [~"data: signals ", json:encode(Map), $\n]
     catch
         error:_ -> error({invalid_argument, Argument, not_encodable})
     end.
@@ -346,7 +347,7 @@ Raises:
 """.
 -spec remove_signals([binary()], patch_signals_opts()) -> iodata().
 remove_signals(Paths, Opts) ->
-    signals_event(encoded(null_merge(Paths, #{}), paths), Opts).
+    signals_event(encoded_line(null_merge(Paths, #{}), paths), Opts).
 
 -doc """
 Decode a JSON signal payload into a map.
@@ -373,13 +374,18 @@ read_signals(Payload) ->
 %% -- internal -----------------------------------------------------------------
 
 known_options(Opts, Known) when is_map(Opts) ->
-    case maps:keys(Opts) -- Known of
-        [] -> ok;
-        [Key | _] when is_atom(Key) -> error({invalid_option, Key, unknown_option});
-        _NotAnAtom -> error({invalid_option, options, unknown_option})
-    end;
+    known_keys(maps:next(maps:iterator(Opts)), Known);
 known_options(_Opts, _Known) ->
     error({invalid_option, options, not_a_map}).
+
+known_keys(none, _Known) ->
+    ok;
+known_keys({Key, _Value, Iterator}, Known) ->
+    case lists:member(Key, Known) of
+        true -> known_keys(maps:next(Iterator), Known);
+        false when is_atom(Key) -> error({invalid_option, Key, unknown_option});
+        false -> error({invalid_option, options, unknown_option})
+    end.
 
 flag(Option, Opts, Default) ->
     case maps:get(Option, Opts, Default) of
@@ -480,13 +486,25 @@ namespace_line(Namespace) ->
 
 single_line(Option, Value) ->
     Bin = to_binary(Value, {invalid_option, Option, not_iodata}),
-    case binary:match(Bin, [~"\r", ~"\n", <<0>>]) of
+    case binary:match(Bin, line_break_or_nul()) of
         nomatch -> Bin;
         {Position, 1} -> error({invalid_option, Option, refused_byte(binary:at(Bin, Position))})
     end.
 
 refused_byte(0) -> nul;
 refused_byte(_LineBreak) -> line_break.
+
+%% Compiling the pattern costs several times more than matching a short
+%% value against it, so it is compiled once and kept.
+line_break_or_nul() ->
+    case persistent_term:get({?MODULE, line_break_or_nul}, undefined) of
+        undefined ->
+            Pattern = binary:compile_pattern([~"\r", ~"\n", ~"\0"]),
+            persistent_term:put({?MODULE, line_break_or_nul}, Pattern),
+            Pattern;
+        Pattern ->
+            Pattern
+    end.
 
 patch_signals_option_lines(Opts) ->
     case flag(only_if_missing, Opts, false) of
@@ -573,9 +591,12 @@ escaped(Byte) -> <<Byte>>.
 
 script_body(Script) ->
     Bin = to_binary(Script, {invalid_argument, script, not_iodata}),
-    case re:run(Bin, ~"</script", [caseless, {capture, none}]) of
-        nomatch -> Bin;
-        match -> error({invalid_argument, script, closing_tag})
+    case
+        binary:match(Bin, ~"</") =/= nomatch andalso
+            re:run(Bin, ~"</script", [caseless, {capture, none}])
+    of
+        match -> error({invalid_argument, script, closing_tag});
+        _NoClosingTag -> Bin
     end.
 
 null_merge([], Merge) ->
