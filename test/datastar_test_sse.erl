@@ -17,7 +17,7 @@
 
 -record(reader, {
     type = ~"" :: binary(),
-    data = [] :: [binary()],
+    data = none :: none | binary(),
     id = ~"" :: binary(),
     retry = undefined :: non_neg_integer() | undefined
 }).
@@ -30,7 +30,7 @@ events(Stream) ->
 fields(Data) ->
     Pairs = [key_value(Line) || Line <- binary:split(Data, ~"\n", [global])],
     maps:map(
-        fun(_Key, Values) -> iolist_to_binary(lists:join(~"\n", Values)) end,
+        fun(_Key, Values) -> joined(Values) end,
         maps:groups_from_list(
             fun({Key, _Value}) -> Key end,
             fun({_Key, Value}) -> Value end,
@@ -53,20 +53,27 @@ texts() ->
         ~"retry: 1",
         ~": note"
     ],
-    lists:usort([
-        iolist_to_binary(Text)
-     || Break <- Breaks,
-        Line <- Lines,
-        Text <- [
-            [Break],
-            [Break, Line],
-            [Line, Break],
-            [~"a", Break, Line],
-            [~"a", Break, Line, Break, ~"b"],
-            [Break, Line, Break],
-            [~"a", Break, ~"event: datastar-patch-signals", Break, Line, Break, Break, ~"b"]
-        ]
-    ]).
+    Breaks ++ [Text || Break <- Breaks, Line <- Lines, Text <- shapes(Break, Line)].
+
+-spec shapes(binary(), binary()) -> [binary()].
+shapes(Break, Line) ->
+    [
+        <<Break/binary, Line/binary>>,
+        <<Line/binary, Break/binary>>,
+        <<$a, Break/binary, Line/binary>>,
+        <<$a, Break/binary, Line/binary, Break/binary, $b>>,
+        <<Break/binary, Line/binary, Break/binary>>,
+        <<
+            $a,
+            Break/binary,
+            "event: datastar-patch-signals",
+            Break/binary,
+            Line/binary,
+            Break/binary,
+            Break/binary,
+            $b
+        >>
+    ].
 
 -spec as_received(iodata()) -> binary().
 as_received(Text) ->
@@ -96,20 +103,24 @@ lines(<<Byte, Rest/binary>>, Line, Acc) ->
 
 read([], _Reader, Events) ->
     lists:reverse(Events);
-read([<<>> | Lines], #reader{data = []} = Reader, Events) ->
+read([<<>> | Lines], #reader{data = none} = Reader, Events) ->
     read(Lines, Reader#reader{type = ~""}, Events);
-read([<<>> | Lines], Reader, Events) ->
+read([<<>> | Lines], #reader{data = Data} = Reader, Events) ->
     Event = #{
         type => type(Reader#reader.type),
-        data => iolist_to_binary(lists:join(~"\n", lists:reverse(Reader#reader.data))),
+        data => Data,
         id => Reader#reader.id,
         retry => Reader#reader.retry
     },
-    read(Lines, Reader#reader{type = ~"", data = []}, [Event | Events]);
+    read(Lines, Reader#reader{type = ~"", data = none}, [Event | Events]);
 read([<<$:, _Comment/binary>> | Lines], Reader, Events) ->
     read(Lines, Reader, Events);
 read([Line | Lines], Reader, Events) ->
     read(Lines, field(name_value(Line), Reader), Events).
+
+-spec joined([binary()]) -> binary().
+joined([]) -> <<>>;
+joined([First | Rest]) -> iolist_to_binary([First | [[$\n, Line] || Line <- Rest]]).
 
 type(<<>>) -> ~"message";
 type(Type) -> Type.
@@ -123,8 +134,10 @@ name_value(Line) ->
 
 field({~"event", Value}, Reader) ->
     Reader#reader{type = Value};
-field({~"data", Value}, Reader) ->
-    Reader#reader{data = [Value | Reader#reader.data]};
+field({~"data", Value}, #reader{data = none} = Reader) ->
+    Reader#reader{data = Value};
+field({~"data", Value}, #reader{data = Data} = Reader) ->
+    Reader#reader{data = <<Data/binary, $\n, Value/binary>>};
 field({~"id", Value}, Reader) ->
     case binary:match(Value, <<0>>) of
         nomatch -> Reader#reader{id = Value};
