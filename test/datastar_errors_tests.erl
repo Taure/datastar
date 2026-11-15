@@ -2,10 +2,10 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--define(HTML, ~"<p>s3cr3t</p>").
--define(SCRIPT, ~"s3cr3t()").
--define(SIGNALS, #{~"token" => ~"s3cr3t"}).
--define(PATHS, [~"s3cr3t.token"]).
+-define(HTML, ~"<p>kept_private</p>").
+-define(SCRIPT, ~"kept_private()").
+-define(SIGNALS, #{~"token" => ~"kept_private"}).
+-define(PATHS, [~"kept_private.token"]).
 
 every_bad_option_raises_invalid_option_test() ->
     Cases = bad_options(),
@@ -48,7 +48,7 @@ bad_options() ->
                 {patch_elements, [?HTML], id},
                 {patch_signals, [?SIGNALS], id},
                 {execute_script, [?SCRIPT], id},
-                {remove_elements, [~"#s3cr3t"], id},
+                {remove_elements, [~"#kept_private"], id},
                 {remove_signals, [?PATHS], id}
             ],
             Value <- not_iodata()
@@ -59,62 +59,74 @@ bad_options() ->
         ],
         [
             {patch_elements, [?HTML, #{mode => Mode}], {invalid_option, mode, unknown_mode}}
-         || Mode <- [s3cr3t, "s3cr3t", ~"s3cr3t", "inner", [~"inner"], ~"Inner", ~"", 1, #{}]
+         || Mode <- [
+                kept_private,
+                "kept_private",
+                ~"kept_private",
+                "inner",
+                [~"inner"],
+                ~"Inner",
+                ~"",
+                1,
+                #{}
+            ]
         ],
         [
             {patch_elements, [?HTML, #{namespace => Namespace}],
                 {invalid_option, namespace, unknown_namespace}}
-         || Namespace <- [s3cr3t, "s3cr3t", ~"s3cr3t", "svg", [~"svg"], ~"SVG", ~"", 1, #{}]
+         || Namespace <- [
+                kept_private, "kept_private", ~"kept_private", "svg", [~"svg"], ~"SVG", ~"", 1, #{}
+            ]
         ],
         [
             {Function, Args ++ [#{Option => Flag}], {invalid_option, Option, not_a_boolean}}
          || {Function, Args, Option} <- [
                 {patch_elements, [?HTML], use_view_transition},
-                {remove_elements, [~"#s3cr3t"], use_view_transition},
+                {remove_elements, [~"#kept_private"], use_view_transition},
                 {patch_signals, [?SIGNALS], only_if_missing},
                 {remove_signals, [?PATHS], only_if_missing},
                 {execute_script, [?SCRIPT], auto_remove}
             ],
-            Flag <- [s3cr3t, ~"s3cr3t", "true", ~"true", 1, 0, undefined]
+            Flag <- [kept_private, ~"kept_private", "true", ~"true", 1, 0, undefined]
         ],
         [
             {Function, Args ++ [#{retry => Retry}],
                 {invalid_option, retry, not_a_non_negative_integer}}
          || {Function, Args} <- builders(),
-            Retry <- [~"s3cr3t", "s3cr3t", s3cr3t, 1.0]
+            Retry <- [~"kept_private", "kept_private", kept_private, 1.0]
         ],
         [
             {execute_script, [?SCRIPT, #{attributes => Attributes}],
                 {invalid_option, attributes, not_a_list_of_pairs}}
          || Attributes <- [
-                s3cr3t,
-                ~"s3cr3t",
-                #{~"nonce" => ~"s3cr3t"},
-                [~"s3cr3t"],
-                [{~"s3cr3t"}],
-                [{~"nonce", ~"s3cr3t", ~"more"}],
-                [{~"nonce", ~"n"}, s3cr3t]
+                kept_private,
+                ~"kept_private",
+                #{~"nonce" => ~"kept_private"},
+                [~"kept_private"],
+                [{~"kept_private"}],
+                [{~"nonce", ~"kept_private", ~"more"}],
+                [{~"nonce", ~"n"}, kept_private]
             ]
         ],
         [
             {execute_script, [?SCRIPT, #{attributes => [Attribute]}],
                 {invalid_option, attributes, not_iodata}}
          || Attribute <- [
-                {s3cr3t, ~"v"},
-                {~"nonce", s3cr3t},
+                {kept_private, ~"v"},
+                {~"nonce", kept_private},
                 {~"nonce", 42},
-                {~"nonce", [~"s3cr3t", {x}]},
-                {[~"s3cr3t", 256], ~"v"}
+                {~"nonce", [~"kept_private", {x}]},
+                {[~"kept_private", 256], ~"v"}
             ]
         ],
         [
-            {Function, Args ++ [Opts#{~"s3cr3t" => ~"s3cr3t"}],
+            {Function, Args ++ [Opts#{~"kept_private" => ~"kept_private"}],
                 {invalid_option, options, unknown_option}}
          || {Function, Args} <- builders(),
             Opts <- [#{}, #{id => ~"7"}]
         ],
         [
-            {Function, Args ++ [#{Key => ~"s3cr3t"}], {invalid_option, Key, unknown_option}}
+            {Function, Args ++ [#{Key => ~"kept_private"}], {invalid_option, Key, unknown_option}}
          || {Function, Args, Key} <- [
                 {patch_elements, [?HTML], selecter},
                 {patch_elements, [?HTML], only_if_missing},
@@ -128,8 +140,8 @@ bad_options() ->
                 {execute_script, [?SCRIPT], mode},
                 {execute_script, [?SCRIPT], namespace},
                 {execute_script, [?SCRIPT], autoRemove},
-                {remove_elements, [~"#s3cr3t"], only_if_missing},
-                {remove_elements, [~"#s3cr3t"], retyr},
+                {remove_elements, [~"#kept_private"], only_if_missing},
+                {remove_elements, [~"#kept_private"], retyr},
                 {remove_signals, [?PATHS], selector},
                 {remove_signals, [?PATHS], namespace}
             ]
@@ -137,7 +149,7 @@ bad_options() ->
         [
             {Function, Args ++ [Opts], {invalid_option, options, not_a_map}}
          || {Function, Args} <- builders(),
-            Opts <- [[{id, ~"s3cr3t"}], ~"s3cr3t", s3cr3t]
+            Opts <- [[{id, ~"kept_private"}], ~"kept_private", kept_private]
         ]
     ]).
 
@@ -155,39 +167,48 @@ bad_arguments() ->
         [
             {patch_signals, [Signals], {invalid_argument, signals, not_encodable}}
          || Signals <- [
-                #{~"token" => {~"s3cr3t"}},
-                #{~"token" => <<"s3cr3t", 16#FF>>},
-                #{{~"s3cr3t"} => 1},
-                #{<<"s3cr3t", 16#C3>> => 1}
+                #{~"token" => {~"kept_private"}},
+                #{~"token" => <<"kept_private", 16#FF>>},
+                #{{~"kept_private"} => 1},
+                #{<<"kept_private", 16#C3>> => 1}
             ]
         ],
         [
             {remove_signals, [Paths], {invalid_argument, paths, not_a_list_of_binaries}}
          || Paths <- [
-                s3cr3t,
-                ~"s3cr3t.token",
-                [s3cr3t],
-                ["s3cr3t"],
-                [[~"s3cr3t"]],
-                [~"a", {~"s3cr3t"}]
+                kept_private,
+                ~"kept_private.token",
+                [kept_private],
+                ["kept_private"],
+                [[~"kept_private"]],
+                [~"a", {~"kept_private"}]
             ]
         ],
         [
-            {remove_signals, [[<<"s3cr3t.", 16#FF>>]], {invalid_argument, paths, not_encodable}},
-            {execute_script, [~"s3cr3t('</script>')"], {invalid_argument, script, closing_tag}},
-            {patch_signals, [~"{\"token\":s3cr3t}"], {invalid_argument, signals, not_json}}
+            {remove_signals, [[<<"kept_private.", 16#FF>>]],
+                {invalid_argument, paths, not_encodable}},
+            {execute_script, [~"kept_private('</script>')"],
+                {invalid_argument, script, closing_tag}},
+            {patch_signals, [~"{\"token\":kept_private}"], {invalid_argument, signals, not_json}}
         ]
     ]).
 
 not_iodata() ->
-    [s3cr3t, 42, {~"s3cr3t"}, [~"s3cr3t", {x}], [~"s3cr3t", 256], #{~"s3cr3t" => 1}].
+    [
+        kept_private,
+        42,
+        {~"kept_private"},
+        [~"kept_private", {x}],
+        [~"kept_private", 256],
+        #{~"kept_private" => 1}
+    ].
 
 builders() ->
     [
         {patch_elements, [?HTML]},
         {patch_signals, [?SIGNALS]},
         {execute_script, [?SCRIPT]},
-        {remove_elements, [~"#s3cr3t"]},
+        {remove_elements, [~"#kept_private"]},
         {remove_signals, [?PATHS]}
     ].
 
@@ -214,6 +235,6 @@ carries_the_secret(Function, Args) ->
             case
                 unicode:characters_to_binary(io_lib:format("~0tp", [{Class, Reason, Stacktrace}]))
             of
-                Shown when is_binary(Shown) -> binary:match(Shown, ~"s3cr3t") =/= nomatch
+                Shown when is_binary(Shown) -> binary:match(Shown, ~"kept_private") =/= nomatch
             end
     end.

@@ -87,8 +87,7 @@ attribute_name_that_is_not_a_plain_name_is_refused_test() ->
         ~"a>b",
         ~"a/b",
         ~"a=b",
-        ~"x onload",
-        ~"x=\"\" y",
+        ~"a b=\"c\"",
         <<"a", 16#FF>>,
         <<16#C3>>
     ],
@@ -124,7 +123,7 @@ script_with_its_own_closing_tag_is_refused_test() ->
         ~"a()</script",
         ~"</script\n>",
         [~"a('</scr", ~"ipt>')"],
-        [~"a(", json:encode(#{~"n" => ~"</script>"}), ~")"]
+        [~"show(", json:encode(#{~"title" => ~"</script>"}), ~")"]
     ],
     ?assertEqual(
         [],
