@@ -87,8 +87,8 @@ lone_cr_is_a_line_break_test() ->
 
 nul_in_elements_is_passed_through_test() ->
     ?assertEqual(
-        [{?ELEMENTS, #{~"elements" => <<"a", 0, "b">>}}],
-        received(datastar:patch_elements(<<"a", 0, "b">>))
+        [{?ELEMENTS, #{~"elements" => ~"a\0b"}}],
+        received(datastar:patch_elements(~"a\0b"))
     ).
 
 events_in_one_stream_stay_separate_test() ->

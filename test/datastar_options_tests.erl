@@ -68,7 +68,7 @@ nul_is_refused_in_an_option_test() ->
             {mode, unknown_mode},
             {namespace, unknown_namespace}
         ],
-        Text <- [<<0>>, <<"a", 0>>, <<0, "a">>, <<"a", 0, "b">>]
+        Text <- [~"\0", ~"a\0", ~"\0a", ~"a\0b"]
     ],
     ?assertEqual(16, length(Cases)),
     ?assertEqual(
@@ -144,7 +144,7 @@ id_reports_the_first_byte_it_refuses_test() ->
     ),
     ?assertEqual(
         {invalid_option, id, nul},
-        raised(patch_elements, [~"<p></p>", #{id => <<0, "\n">>}])
+        raised(patch_elements, [~"<p></p>", #{id => ~"\0\n"}])
     ).
 
 every_printable_ascii_character_is_kept_in_id_test() ->

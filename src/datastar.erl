@@ -419,7 +419,7 @@ event_id(Id) ->
         Reason -> error({invalid_option, id, Reason})
     end.
 
-refused_in_id(<<>>) -> nothing;
+refused_in_id(~"") -> nothing;
 refused_in_id(<<Byte, Rest/binary>>) when Byte >= $\s, Byte =< $~ -> refused_in_id(Rest);
 refused_in_id(<<Byte, _/binary>>) when Byte =:= $\r; Byte =:= $\n -> line_break;
 refused_in_id(<<0, _/binary>>) -> nul;
@@ -512,14 +512,14 @@ patch_signals_option_lines(Opts) ->
         false -> []
     end.
 
-elements_data_lines(<<>>) -> [];
+elements_data_lines(~"") -> [];
 elements_data_lines(Html) -> data_lines(~"data: elements ", Html).
 
 data_lines(Prefix, Bin) ->
     [[Prefix, Line, $\n] || Line <- lines(Bin)].
 
 %% A single-pattern split is several times faster than a three-pattern one,
-%% and text without a carriage return is the common case.
+%% so only text with a carriage return pays for the three-pattern one.
 lines(Bin) ->
     case binary:match(Bin, ~"\r") of
         nomatch -> binary:split(Bin, ~"\n", [global]);
@@ -563,7 +563,7 @@ attribute_name(Name) ->
         false -> error({invalid_option, attributes, invalid_name})
     end.
 
-plain_attribute_name(<<>>) ->
+plain_attribute_name(~"") ->
     true;
 plain_attribute_name(<<Char/utf8, Rest/binary>>) when
     Char > $\s,

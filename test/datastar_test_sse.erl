@@ -77,9 +77,9 @@ shapes(Break, Line) ->
 
 -spec as_received(iodata()) -> binary().
 as_received(Text) ->
-    lf_only(iolist_to_binary(Text), <<>>).
+    lf_only(iolist_to_binary(Text), ~"").
 
-lf_only(<<>>, Acc) -> Acc;
+lf_only(~"", Acc) -> Acc;
 lf_only(<<$\r, $\n, Rest/binary>>, Acc) -> lf_only(Rest, <<Acc/binary, $\n>>);
 lf_only(<<$\r, Rest/binary>>, Acc) -> lf_only(Rest, <<Acc/binary, $\n>>);
 lf_only(<<Byte, Rest/binary>>, Acc) -> lf_only(Rest, <<Acc/binary, Byte>>).
@@ -88,24 +88,24 @@ without_bom(<<16#FEFF/utf8, Rest/binary>>) -> Rest;
 without_bom(Stream) -> Stream.
 
 lines(Stream) ->
-    lines(Stream, <<>>, []).
+    lines(Stream, ~"", []).
 
-lines(<<>>, _Unterminated, Acc) ->
+lines(~"", _Unterminated, Acc) ->
     lists:reverse(Acc);
 lines(<<$\r, $\n, Rest/binary>>, Line, Acc) ->
-    lines(Rest, <<>>, [Line | Acc]);
+    lines(Rest, ~"", [Line | Acc]);
 lines(<<$\r, Rest/binary>>, Line, Acc) ->
-    lines(Rest, <<>>, [Line | Acc]);
+    lines(Rest, ~"", [Line | Acc]);
 lines(<<$\n, Rest/binary>>, Line, Acc) ->
-    lines(Rest, <<>>, [Line | Acc]);
+    lines(Rest, ~"", [Line | Acc]);
 lines(<<Byte, Rest/binary>>, Line, Acc) ->
     lines(Rest, <<Line/binary, Byte>>, Acc).
 
 read([], _Reader, Events) ->
     lists:reverse(Events);
-read([<<>> | Lines], #reader{data = none} = Reader, Events) ->
+read([~"" | Lines], #reader{data = none} = Reader, Events) ->
     read(Lines, Reader#reader{type = ~""}, Events);
-read([<<>> | Lines], #reader{data = Data} = Reader, Events) ->
+read([~"" | Lines], #reader{data = Data} = Reader, Events) ->
     Event = #{
         type => type(Reader#reader.type),
         data => Data,
@@ -119,17 +119,17 @@ read([Line | Lines], Reader, Events) ->
     read(Lines, field(name_value(Line), Reader), Events).
 
 -spec joined([binary()]) -> binary().
-joined([]) -> <<>>;
+joined([]) -> ~"";
 joined([First | Rest]) -> iolist_to_binary([First | [[$\n, Line] || Line <- Rest]]).
 
-type(<<>>) -> ~"message";
+type(~"") -> ~"message";
 type(Type) -> Type.
 
 name_value(Line) ->
     case binary:split(Line, ~":") of
         [Name, <<$\s, Value/binary>>] -> {Name, Value};
         [Name, Value] -> {Name, Value};
-        [Name] -> {Name, <<>>}
+        [Name] -> {Name, ~""}
     end.
 
 field({~"event", Value}, Reader) ->
@@ -139,12 +139,12 @@ field({~"data", Value}, #reader{data = none} = Reader) ->
 field({~"data", Value}, #reader{data = Data} = Reader) ->
     Reader#reader{data = <<Data/binary, $\n, Value/binary>>};
 field({~"id", Value}, Reader) ->
-    case binary:match(Value, <<0>>) of
+    case binary:match(Value, ~"\0") of
         nomatch -> Reader#reader{id = Value};
         _ -> Reader
     end;
 field({~"retry", Value}, Reader) ->
-    case Value =/= <<>> andalso [] =:= [Byte || <<Byte>> <= Value, Byte < $0 orelse Byte > $9] of
+    case Value =/= ~"" andalso [] =:= [Byte || <<Byte>> <= Value, Byte < $0 orelse Byte > $9] of
         true -> Reader#reader{retry = binary_to_integer(Value)};
         false -> Reader
     end;
@@ -154,5 +154,5 @@ field({_Name, _Value}, Reader) ->
 key_value(Line) ->
     case binary:split(Line, ~" ") of
         [Key, Value] -> {Key, Value};
-        [Key] -> {Key, <<>>}
+        [Key] -> {Key, ~""}
     end.

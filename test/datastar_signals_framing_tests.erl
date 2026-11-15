@@ -161,7 +161,7 @@ remove_signals_is_one_event_for_any_line_ending_test() ->
     ).
 
 texts() ->
-    datastar_test_sse:texts() ++ [<<"a", 0, "b">>, <<0>>, <<"a", 16#2028/utf8, "b", 16#2029/utf8>>].
+    datastar_test_sse:texts() ++ [~"a\0b", ~"\0", <<"a", 16#2028/utf8, "b", 16#2029/utf8>>].
 
 raised(Signals, Opts) ->
     try datastar:patch_signals(Signals, Opts) of
@@ -172,7 +172,7 @@ raised(Signals, Opts) ->
 
 on_one_data_line(Out) ->
     case binary:split(Out, [~"\r\n", ~"\r", ~"\n"], [global]) of
-        [~"event: datastar-patch-signals", <<"data: signals ", _/binary>>, <<>>, <<>>] -> true;
+        [~"event: datastar-patch-signals", <<"data: signals ", _/binary>>, ~"", ~""] -> true;
         _ -> false
     end.
 
