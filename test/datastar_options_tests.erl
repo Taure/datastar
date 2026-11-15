@@ -70,6 +70,58 @@ nul_is_refused_in_an_option_test() ->
         ]
     ).
 
+id_that_is_not_printable_ascii_is_refused_test() ->
+    Ids = [
+        <<16#20AC/utf8>>,
+        <<"evt-", 16#100/utf8>>,
+        <<16#1F600/utf8>>,
+        <<"caf", 16#E9/utf8>>,
+        <<16#FEFF/utf8, "7">>,
+        <<16#FF>>,
+        <<"a", 16#C3>>,
+        <<"a", 16#E9>>,
+        ~"a\tb",
+        ~"a\eb",
+        ~"a\db",
+        [~"a", [16#80]]
+    ],
+    Cases = [{Function, Args ++ [#{id => Id}]} || Id <- Ids, {Function, Args} <- builders()],
+    ?assertEqual(60, length(Cases)),
+    ?assertEqual(
+        [],
+        [
+            Case
+         || {Function, Args} = Case <- Cases,
+            raised(Function, Args) =/= {invalid_option, id, not_printable_ascii}
+        ]
+    ).
+
+id_reports_the_first_byte_it_refuses_test() ->
+    ?assertEqual(
+        {invalid_option, id, not_printable_ascii},
+        raised(patch_elements, [~"<p></p>", #{id => <<16#E9/utf8, "\r">>}])
+    ),
+    ?assertEqual(
+        {invalid_option, id, line_break},
+        raised(patch_elements, [~"<p></p>", #{id => <<"\n", 0, 16#E9/utf8>>}])
+    ),
+    ?assertEqual(
+        {invalid_option, id, nul},
+        raised(patch_elements, [~"<p></p>", #{id => <<0, "\n">>}])
+    ).
+
+every_printable_ascii_character_is_kept_in_id_test() ->
+    Id = <<<<Byte>> || Byte <- lists:seq($\s, $~)>>,
+    ?assertEqual(95, byte_size(Id)),
+    ?assertEqual(
+        [[<<"x", Id/binary>>] || _Builder <- builders()],
+        [
+            [EventId || #{id := EventId} <- datastar_test_sse:events(Event)]
+         || {Function, Args} <- builders(),
+            Event <- [apply(datastar, Function, Args ++ [#{id => [~"x", Id]}])]
+        ]
+    ).
+
 retry_is_a_non_negative_integer_test() ->
     Cases = [
         {Function, Args ++ [#{retry => Retry}]}

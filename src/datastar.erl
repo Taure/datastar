@@ -115,6 +115,13 @@ is not a non-negative integer with
 holds for these options in every other function of this module. NUL is
 refused because a client drops an `id` that contains one; in `Html` it
 is passed through.
+
+A client sends the last `id` it received back in a request header when
+it reconnects, so an `id` must be printable ASCII (`16#20` to `16#7E`).
+Any other byte, which includes every byte of a non-ASCII character and
+of invalid UTF-8, is refused with
+`error({invalid_option, id, not_printable_ascii})`. The first byte that
+is refused decides the reason.
 """.
 -spec patch_elements(iodata(), patch_elements_opts()) -> iodata().
 patch_elements(Html, Opts) ->
@@ -274,7 +281,19 @@ sse_meta_lines(Opts) ->
     [id_line(maps:get(id, Opts, undefined)), retry_line(maps:get(retry, Opts, undefined))].
 
 id_line(undefined) -> [];
-id_line(Id) -> [~"id: ", single_line(id, Id), $\n].
+id_line(Id) -> [~"id: ", event_id(iolist_to_binary(Id)), $\n].
+
+event_id(Id) ->
+    case refused_in_id(Id) of
+        nothing -> Id;
+        Reason -> error({invalid_option, id, Reason})
+    end.
+
+refused_in_id(<<>>) -> nothing;
+refused_in_id(<<Byte, Rest/binary>>) when Byte >= $\s, Byte =< $~ -> refused_in_id(Rest);
+refused_in_id(<<Byte, _/binary>>) when Byte =:= $\r; Byte =:= $\n -> line_break;
+refused_in_id(<<0, _/binary>>) -> nul;
+refused_in_id(_Other) -> not_printable_ascii.
 
 retry_line(undefined) -> [];
 retry_line(Retry) when is_integer(Retry), Retry >= 0 -> [~"retry: ", integer_to_binary(Retry), $\n];
