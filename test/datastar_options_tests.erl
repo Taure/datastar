@@ -2,80 +2,89 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-patch_elements_refuses_a_line_break_in_an_option_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, Option, line_break},
-            datastar:patch_elements(~"<p></p>", #{Option => Text})
-        )
-     || Option <- [selector, mode, namespace, id],
-        Text <- datastar_test_sse:texts()
-    ].
+-define(TEXTS, 488).
 
-patch_signals_refuses_a_line_break_in_id_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, id, line_break},
-            datastar:patch_signals(#{~"a" => 1}, #{id => Text})
-        )
-     || Text <- datastar_test_sse:texts()
-    ].
-
-execute_script_refuses_a_line_break_in_id_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, id, line_break},
-            datastar:execute_script(~"x()", #{id => Text})
-        )
-     || Text <- datastar_test_sse:texts()
-    ].
-
-remove_elements_refuses_a_line_break_in_its_selector_test_() ->
-    [
+patch_elements_refuses_a_line_break_in_an_option_test() ->
+    Cases = [
+        {Option, Text}
+     || Option <- [selector, mode, namespace, id], Text <- datastar_test_sse:texts()
+    ],
+    ?assertEqual(4 * ?TEXTS, length(Cases)),
+    ?assertEqual(
+        [],
         [
-            ?_assertError({invalid_option, selector, line_break}, datastar:remove_elements(Text)),
-            ?_assertError(
-                {invalid_option, id, line_break},
-                datastar:remove_elements(~"#gone", #{id => Text})
-            )
+            Case
+         || {Option, Text} = Case <- Cases,
+            raised(patch_elements, [~"<p></p>", #{Option => Text}]) =/=
+                {invalid_option, Option, line_break}
         ]
-     || Text <- datastar_test_sse:texts()
-    ].
+    ).
 
-remove_signals_refuses_a_line_break_in_id_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, id, line_break},
-            datastar:remove_signals([~"a"], #{id => Text})
-        )
-     || Text <- datastar_test_sse:texts()
-    ].
+every_builder_refuses_a_line_break_in_id_test() ->
+    Cases = [
+        {Function, Args ++ [#{id => Text}]}
+     || {Function, Args} <- [
+            {patch_signals, [#{~"a" => 1}]},
+            {execute_script, [~"x()"]},
+            {remove_elements, [~"#gone"]},
+            {remove_signals, [[~"a"]]}
+        ],
+        Text <- datastar_test_sse:texts()
+    ],
+    ?assertEqual(4 * ?TEXTS, length(Cases)),
+    ?assertEqual(
+        [],
+        [
+            Case
+         || {Function, Args} = Case <- Cases,
+            raised(Function, Args) =/= {invalid_option, id, line_break}
+        ]
+    ).
 
-nul_is_refused_in_an_option_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, Option, nul},
-            datastar:patch_elements(~"<p></p>", #{Option => Text})
-        )
+remove_elements_refuses_a_line_break_in_its_selector_test() ->
+    Texts = datastar_test_sse:texts(),
+    ?assertEqual(?TEXTS, length(Texts)),
+    ?assertEqual(
+        [],
+        [
+            Text
+         || Text <- Texts,
+            raised(remove_elements, [Text]) =/= {invalid_option, selector, line_break}
+        ]
+    ).
+
+nul_is_refused_in_an_option_test() ->
+    Cases = [
+        {Option, Text}
      || Option <- [selector, mode, namespace, id],
         Text <- [<<0>>, <<"a", 0>>, <<0, "a">>, <<"a", 0, "b">>]
-    ].
-
-retry_is_a_non_negative_integer_test_() ->
-    [
-        ?_assertError(
-            {invalid_option, retry, not_a_non_negative_integer},
-            Build(#{retry => Retry})
-        )
-     || Retry <- [-1, 1.5, ~"1", ~"1\r\n", ~"1\ndata: elements x", [$1, $\r]],
-        Build <- [
-            fun(Opts) -> datastar:patch_elements(~"<p></p>", Opts) end,
-            fun(Opts) -> datastar:patch_signals(#{~"a" => 1}, Opts) end,
-            fun(Opts) -> datastar:execute_script(~"x()", Opts) end,
-            fun(Opts) -> datastar:remove_elements(~"#gone", Opts) end,
-            fun(Opts) -> datastar:remove_signals([~"a"], Opts) end
+    ],
+    ?assertEqual(16, length(Cases)),
+    ?assertEqual(
+        [],
+        [
+            Case
+         || {Option, Text} = Case <- Cases,
+            raised(patch_elements, [~"<p></p>", #{Option => Text}]) =/=
+                {invalid_option, Option, nul}
         ]
-    ].
+    ).
+
+retry_is_a_non_negative_integer_test() ->
+    Cases = [
+        {Function, Args ++ [#{retry => Retry}]}
+     || Retry <- [-1, 1.5, ~"1", ~"1\r\n", ~"1\ndata: elements x", [$1, $\r]],
+        {Function, Args} <- builders()
+    ],
+    ?assertEqual(30, length(Cases)),
+    ?assertEqual(
+        [],
+        [
+            Case
+         || {Function, Args} = Case <- Cases,
+            raised(Function, Args) =/= {invalid_option, retry, not_a_non_negative_integer}
+        ]
+    ).
 
 single_line_options_arrive_as_given_test() ->
     Opts = #{
@@ -120,3 +129,19 @@ option_given_as_iodata_is_checked_too_test() ->
             ~"data: selector #a b\n"
         )
     ).
+
+builders() ->
+    [
+        {patch_elements, [~"<p></p>"]},
+        {patch_signals, [#{~"a" => 1}]},
+        {execute_script, [~"x()"]},
+        {remove_elements, [~"#gone"]},
+        {remove_signals, [[~"a"]]}
+    ].
+
+raised(Function, Args) ->
+    try apply(datastar, Function, Args) of
+        _Event -> nothing
+    catch
+        error:Reason -> Reason
+    end.

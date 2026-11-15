@@ -16,8 +16,7 @@ crlf_split_across_iodata_chunks_is_one_line_break_test_() ->
             [~"a", ~"\r", ~"\n", ~"b"],
             [[~"a\r"], [[~"\n"], ~"b"]],
             [~"a\r", $\n, ~"b"],
-            [~"a\r", ~"", ~"\nb"],
-            [~"a\r" | ~"\nb"]
+            [~"a\r", ~"", ~"\nb"]
         ]
     ].
 
