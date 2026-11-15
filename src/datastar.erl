@@ -11,8 +11,8 @@ whatever you have).
 
 The Datastar v1 protocol defines two wire events:
 
-- `datastar-patch-elements` — patch HTML into the DOM
-- `datastar-patch-signals` — patch signals into the client-side store
+- `datastar-patch-elements`: patch HTML into the DOM
+- `datastar-patch-signals`: patch signals into the client-side store
 
 `execute_script/1,2`, `remove_elements/1,2`, and `remove_signals/1,2`
 compile down to these two events as ergonomic sugar.
@@ -354,7 +354,7 @@ Decode a JSON signal payload into a map.
 
 Datastar sends signals as URL-encoded JSON in the `datastar` query
 parameter for `GET`, or as a JSON body otherwise. Once the framework
-has URL-decoded the query value, both paths are raw JSON — pass it here.
+has URL-decoded the query value, both paths are raw JSON. Pass it here.
 
     case datastar:read_signals(Body) of
         {ok, #{~"count" := N}} -> ...;

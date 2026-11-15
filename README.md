@@ -1,6 +1,6 @@
 # datastar
 
-Erlang SDK for [Datastar](https://data-star.dev) — the hypermedia framework
+Erlang SDK for [Datastar](https://data-star.dev), the hypermedia framework
 that collapses HTMX + Alpine into a single `data-*` vocabulary with SSE as
 a first-class transport.
 
@@ -18,9 +18,12 @@ Add to `rebar.config`:
 
 ```erlang
 {deps, [
-    {datastar, {git, "https://github.com/Taure/datastar.git", {branch, "main"}}}
+    {datastar, {git, "https://github.com/Taure/datastar.git", {tag, "vX.Y.Z"}}}
 ]}.
 ```
+
+`vX.Y.Z` is a placeholder. Put the release you want in its place; the
+releases are listed in [CHANGELOG.md](CHANGELOG.md).
 
 Requires OTP 28 or later.
 
@@ -57,7 +60,7 @@ Event6 = datastar:remove_signals([~"user.email", ~"cart"]).
 Datastar sends the current signal store on every action: as a URL-encoded
 JSON string in the `datastar` query parameter for `GET`, or as the JSON
 body otherwise. After your web framework has URL-decoded the query value,
-both paths are just raw JSON — hand it to `read_signals/1`:
+both paths are just raw JSON. Hand it to `read_signals/1`:
 
 ```erlang
 case datastar:read_signals(Body) of
@@ -87,7 +90,7 @@ plugin is planned as a separate library.
 
 ## Module layout
 
-One module, `datastar` — everything (event builders, headers, signal
+One module, `datastar`: everything (event builders, headers, signal
 reader) lives there.
 
 ## Protocol coverage
@@ -104,42 +107,67 @@ All `data:`-level fields from the v1 spec are supported: `selector`,
 `mode`, `useViewTransition`, `namespace`, `onlyIfMissing`, `signals`,
 `elements`, plus the standard SSE `id` and `retry` fields.
 
-## Line endings and option values
+## Line endings
 
 An SSE client ends a line at `\r\n`, `\r` or `\n`. The builders follow the
 same rule:
 
 | Input | What happens to `\r`, `\n`, `\r\n` |
 |-------|-----------------------------------|
-| `Html` of `patch_elements/1,2`, `Script` and `attributes` of `execute_script/1,2` | Each one ends a line. Every line gets its own `data: elements` prefix. The client receives the break as `\n`. |
-| Pre-encoded JSON of `patch_signals/1,2` | Same, with a `data: signals` prefix. |
+| `Html` of `patch_elements/1,2`, `Script` and attribute values of `execute_script/1,2` | Each one ends a line. Every line gets its own `data: elements` prefix. The client receives the break as `\n`. |
+| Pre-encoded JSON of `patch_signals/1,2` | Same, with a `data: signals` prefix. JSON allows a line break between tokens only. |
 | A map given to `patch_signals/1,2`, the paths of `remove_signals/1,2` | Encoded by `json`, which escapes every control character, so the value is one line. |
-| `selector`, `mode`, `namespace`, `id` | Refused: `error({invalid_option, Option, line_break})`. |
-| `retry` | Must be a non-negative integer: `error({invalid_option, retry, not_a_non_negative_integer})`. |
+| `selector`, `id` | Refused: `error({invalid_option, Option, line_break})`. |
 
-A NUL byte in `selector`, `mode`, `namespace` or `id` is refused too
+A NUL byte in `selector` or `id` is refused too
 (`error({invalid_option, Option, nul})`), because a client drops an `id`
-that contains one. In HTML, scripts and pre-encoded JSON it is passed
-through unchanged; in a map it is escaped as `\u0000`. U+2028 and U+2029
-are not line breaks in SSE and are sent as the UTF-8 text they are.
+that contains one. In HTML and scripts it is passed through unchanged; in
+a map it is escaped as `\u0000`. U+2028 and U+2029 are not line breaks in
+SSE and are sent as the UTF-8 text they are.
 
-The builders do not escape HTML. `execute_script/2` writes the script
-body and the attribute names and values as given.
+## What the builders check
+
+The builders raise on a bad option or argument. They do not return an
+error tuple and they do not rewrite a value to make it fit.
+
+| Input | Rule |
+|-------|------|
+| Options | A map. Every key is one the function takes. A key that is present holds a valid value: `undefined` does not stand for an absent option. |
+| `selector` | iodata on one line. |
+| `mode` | `outer`, `inner`, `replace`, `prepend`, `append`, `before`, `after` or `remove`, as an atom or a binary. |
+| `namespace` | `html`, `svg` or `mathml`, as an atom or a binary. |
+| `use_view_transition`, `only_if_missing`, `auto_remove` | A boolean. |
+| `id` | Printable ASCII (`16#20` to `16#7E`) on one line. A client sends the last `id` back in a request header when it reconnects. |
+| `retry` | An integer from 0 to 2147483647 milliseconds (2^31 - 1, a little under 25 days, the longest delay a browser timer takes). |
+| Pre-encoded JSON of `patch_signals/1,2` | Exactly one JSON value, as `json:decode/1` reads it. |
+| `attributes` of `execute_script/2` | A list of `{Name, Value}`. A value is escaped for a double-quoted HTML attribute. A name is written as given and must be a plain HTML attribute name: not empty, valid UTF-8, without whitespace, control characters, `"`, `'`, `>`, `/` or `=`. |
+| `Script` of `execute_script/1,2` | Must not contain `</script`, in any letter case: the element would end there. Inside a JavaScript string, write `<\/script`. |
+
+Two errors are raised:
+
+- `error({invalid_option, Option, Reason})` for a key of the options map
+- `error({invalid_argument, Argument, Reason})` for `html`, `script`,
+  `signals` or `paths`
+
+Neither one, nor its stack trace, holds the value that was refused. The
+module documentation lists every `Reason` and the errors each function
+raises.
+
+The check on pre-encoded JSON decodes the payload once, so it takes time
+in proportion to its size. A caller that holds the signals as a map can
+pass the map: it is encoded once and not checked again.
+
+The builders do not escape `Html` or `Script`. Escaping text that goes
+into markup is the job of whatever builds the markup. Escaping an
+attribute value of `execute_script/2` keeps it inside its attribute; it
+does not make untrusted text safe in an attribute whose value is code
+or a URL to load code from, such as `src`, `on*` or a Datastar `data-*`
+expression.
 
 ## Upgrading
 
-Changes after `fcc11f3` that a caller can notice:
-
-- A carriage return in streamed HTML, in a script or in pre-encoded
-  signals JSON is now a line break, as `\n` already was. `\r\n` counts
-  once. The browser receives `\n` in its place.
-- Pre-encoded signals JSON that spans several lines is now sent as
-  several `data: signals` lines and arrives whole.
-- `selector`, `mode`, `namespace` and `id` values containing `\r`, `\n`
-  or NUL raise `{invalid_option, Option, line_break | nul}` instead of
-  being written. Validate or strip such values before passing them.
-- `retry` raises `{invalid_option, retry, not_a_non_negative_integer}`
-  for anything but a non-negative integer.
+Every change a caller can notice is listed in
+[CHANGELOG.md](CHANGELOG.md), breaking changes first.
 
 ## License
 
