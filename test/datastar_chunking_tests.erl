@@ -55,12 +55,20 @@ every_short_text_in_every_chunking_test() ->
 
 megabyte_of_mixed_line_endings_in_small_chunks_arrives_whole_test() ->
     Chunks = [
-        [~"<tr><td>", integer_to_binary(Row), ~"</td>\r", ~"\n</tr>", Break]
-     || Row <- lists:seq(1, 40000),
-        Break <- [lists:nth(Row rem 4 + 1, [~"\n", ~"\r", ~"\r\n", ~""])]
+        [~"<tr><td>", integer_to_binary(Row), ~"</td>\r", ~"\n</tr>", line_ending(Row)]
+     || Row <- lists:seq(1, 40000)
     ],
     ?assert(iolist_size(Chunks) > 1000000),
     ?assertEqual(expected(iolist_to_binary(Chunks)), received(datastar:patch_elements(Chunks))).
+
+-spec line_ending(pos_integer()) -> binary().
+line_ending(Row) ->
+    case Row rem 4 of
+        0 -> ~"\n";
+        1 -> ~"\r";
+        2 -> ~"\r\n";
+        _ -> ~""
+    end.
 
 expected(~"") -> [];
 expected(Text) -> [{?ELEMENTS, #{~"elements" => datastar_test_sse:as_received(Text)}}].
