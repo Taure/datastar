@@ -143,19 +143,35 @@ A map is written on one line: `json` escapes every control character,
 `data: signals <line>` per line the same way `patch_elements/2` splits
 HTML, so JSON that was pretty-printed arrives whole.
 
+Pre-encoded JSON must be exactly one JSON value, as `json:decode/1`
+reads it. Anything else is refused with
+`error({invalid_argument, signals, not_json})`. The check decodes the
+value once, so its cost grows with the size of the payload; a map is
+encoded once and not checked again.
+
 Options: `only_if_missing`, plus standard SSE `id` / `retry`.
 """.
 -spec patch_signals(map() | iodata(), patch_signals_opts()) -> iodata().
 patch_signals(Signals, Opts) when is_map(Signals) ->
-    patch_signals(json:encode(Signals), Opts);
+    signals_event(iolist_to_binary(json:encode(Signals)), Opts);
 patch_signals(Json, Opts) ->
+    signals_event(json_text(iolist_to_binary(Json)), Opts).
+
+signals_event(Json, Opts) ->
     [
         event_line(?EVT_PATCH_SIGNALS),
         sse_meta_lines(Opts),
         patch_signals_option_lines(Opts),
-        data_lines(~"data: signals ", iolist_to_binary(Json)),
+        data_lines(~"data: signals ", Json),
         $\n
     ].
+
+json_text(Bin) ->
+    try json:decode(Bin) of
+        _Value -> Bin
+    catch
+        error:_ -> error({invalid_argument, signals, not_json})
+    end.
 
 -doc #{equiv => execute_script(Script, #{})}.
 -spec execute_script(iodata()) -> iodata().

@@ -53,8 +53,8 @@ patch_signals_json_is_one_event_for_any_line_ending_between_tokens_test() ->
         [
             Break
          || Break <- Breaks,
-            decoded(
-                datastar:patch_signals([
+            Json <- [
+                [
                     Break,
                     ~"{",
                     Break,
@@ -66,12 +66,76 @@ patch_signals_json_is_one_event_for_any_line_ending_between_tokens_test() ->
                     Break,
                     ~"}",
                     Break
-                ])
-            ) =/= [{?SIGNALS, #{~"a" => [1, ~"b"]}}]
+                ]
+            ],
+            Event <- [datastar:patch_signals(Json, #{only_if_missing => true})],
+            decoded(datastar:patch_signals(Json)) =/= [{?SIGNALS, #{~"a" => [1, ~"b"]}}] orelse
+                received(Event) =/=
+                    [
+                        {?SIGNALS, #{
+                            ~"onlyIfMissing" => ~"true",
+                            ~"signals" => datastar_test_sse:as_received(Json)
+                        }}
+                    ]
         ]
     ).
 
-patch_signals_iodata_is_one_event_for_any_line_ending_test() ->
+pre_encoded_signals_that_are_json_are_written_as_given_test() ->
+    Values = [
+        ~"{}",
+        ~"{\"a\":1}",
+        ~" {\"a\" : [1, 2.5e3, true, false, null, \"b\\n\"]} ",
+        [~"{\"a\":", ~"1}"],
+        ~"null",
+        ~"[1]",
+        ~"5",
+        ~"\"text\"",
+        <<"{\"a\":\"", 16#2028/utf8, "\"}">>
+    ],
+    ?assertEqual(
+        [],
+        [
+            Json
+         || Json <- Values,
+            received(datastar:patch_signals(Json)) =/=
+                [{?SIGNALS, #{~"signals" => iolist_to_binary(Json)}}]
+        ]
+    ).
+
+pre_encoded_signals_that_are_not_json_are_refused_test() ->
+    Values = [
+        ~"",
+        ~" ",
+        ~"{bad",
+        ~"{\"a\":1} x",
+        ~"{\"a\":1}{\"b\":2}",
+        ~"{\"a\":1},",
+        ~"(1,{})",
+        ~"{a:1}",
+        ~"{'a':1}",
+        ~"{\"a\":1,}",
+        ~"{\"a\":\"x\ny\"}",
+        ~"{\"a\":\"x\ry\"}",
+        ~"{\"a\":\"x\0y\"}",
+        <<"{\"a\":\"", 16#FF, "\"}">>,
+        ~"{\"a\":\"\\ud800\"}",
+        ~"01",
+        ~"undefined",
+        ~"NaN",
+        ~"new Date()",
+        [~"{\"a\":", ~"}"]
+    ],
+    ?assertEqual(
+        [],
+        [
+            Json
+         || Json <- Values,
+            Opts <- [#{}, #{only_if_missing => true}],
+            raised(Json, Opts) =/= {invalid_argument, signals, not_json}
+        ]
+    ).
+
+pre_encoded_signals_from_the_line_ending_corpus_are_refused_test() ->
     Texts = datastar_test_sse:texts(),
     ?assertEqual(?TEXTS, length(Texts)),
     ?assertEqual(
@@ -79,13 +143,7 @@ patch_signals_iodata_is_one_event_for_any_line_ending_test() ->
         [
             Text
          || Text <- Texts,
-            received(datastar:patch_signals(Text, #{only_if_missing => true})) =/=
-                [
-                    {?SIGNALS, #{
-                        ~"onlyIfMissing" => ~"true",
-                        ~"signals" => datastar_test_sse:as_received(Text)
-                    }}
-                ]
+            raised(Text, #{only_if_missing => true}) =/= {invalid_argument, signals, not_json}
         ]
     ).
 
@@ -104,6 +162,13 @@ remove_signals_is_one_event_for_any_line_ending_test() ->
 
 texts() ->
     datastar_test_sse:texts() ++ [<<"a", 0, "b">>, <<0>>, <<"a", 16#2028/utf8, "b", 16#2029/utf8>>].
+
+raised(Signals, Opts) ->
+    try datastar:patch_signals(Signals, Opts) of
+        _Event -> nothing
+    catch
+        error:Reason -> Reason
+    end.
 
 on_one_data_line(Out) ->
     case binary:split(Out, [~"\r\n", ~"\r", ~"\n"], [global]) of
