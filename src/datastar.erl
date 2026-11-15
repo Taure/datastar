@@ -341,8 +341,8 @@ Options: as in `patch_signals/2`.
 Raises:
 
 - `{invalid_argument, paths, not_a_list_of_binaries}`
-- `{invalid_argument, paths, not_encodable}` for a path that is not
-  valid UTF-8
+- `{invalid_argument, paths, not_encodable}` for a path to remove that
+  is not valid UTF-8
 - the option errors of `patch_signals/2`
 """.
 -spec remove_signals([binary()], patch_signals_opts()) -> iodata().
