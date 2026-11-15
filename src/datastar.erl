@@ -58,20 +58,20 @@ compile down to these two events as ergonomic sugar.
     use_view_transition => boolean(),
     namespace => namespace(),
     id => binary(),
-    retry => pos_integer()
+    retry => non_neg_integer()
 }.
 
 -type patch_signals_opts() :: #{
     only_if_missing => boolean(),
     id => binary(),
-    retry => pos_integer()
+    retry => non_neg_integer()
 }.
 
 -type execute_script_opts() :: #{
     auto_remove => boolean(),
     attributes => [{binary(), binary()}],
     id => binary(),
-    retry => pos_integer()
+    retry => non_neg_integer()
 }.
 
 -doc "Datastar protocol version this SDK targets.".
@@ -106,6 +106,15 @@ SSE client ends it, so the client receives every line break as `\n`.
 
 Options: `selector`, `mode` (default `outer`), `use_view_transition`,
 `namespace` (default `html`), plus standard SSE `id` / `retry`.
+
+`selector`, `mode`, `namespace` and `id` each take one line of the
+event. A value with `\r`, `\n` or a NUL byte in it is refused with
+`error({invalid_option, Option, line_break | nul})`, and a `retry` that
+is not a non-negative integer with
+`error({invalid_option, retry, not_a_non_negative_integer})`. The same
+holds for these options in every other function of this module. NUL is
+refused because a client drops an `id` that contains one; in `Html` it
+is passed through.
 """.
 -spec patch_elements(iodata(), patch_elements_opts()) -> iodata().
 patch_elements(Html, Opts) ->
@@ -161,6 +170,10 @@ Compiles to `patch_elements/2` with `selector => ~"body"` and
 
 Options: `auto_remove` (default `true`, adds `data-effect="el.remove()"`),
 `attributes` (extra `[{Name, Value}]`), plus standard SSE `id` / `retry`.
+
+`Script` and the attribute names and values are written into the
+element as given, without HTML escaping. Line breaks in them are framed
+the way `patch_elements/2` frames `Html`.
 """.
 -spec execute_script(iodata(), execute_script_opts()) -> iodata().
 execute_script(Script, Opts) ->
@@ -175,7 +188,11 @@ execute_script(Script, Opts) ->
 remove_elements(Selector) ->
     remove_elements(Selector, #{}).
 
--doc "Remove all elements matching `Selector` from the DOM.".
+-doc """
+Remove all elements matching `Selector` from the DOM.
+
+`Selector` is a single-line value, see `patch_elements/2`.
+""".
 -spec remove_elements(binary(), patch_elements_opts()) -> iodata().
 remove_elements(Selector, Opts) ->
     patch_elements(~"", Opts#{selector => Selector, mode => remove}).
@@ -228,10 +245,11 @@ sse_meta_lines(Opts) ->
     [id_line(maps:get(id, Opts, undefined)), retry_line(maps:get(retry, Opts, undefined))].
 
 id_line(undefined) -> [];
-id_line(Id) -> [~"id: ", Id, $\n].
+id_line(Id) -> [~"id: ", single_line(id, Id), $\n].
 
 retry_line(undefined) -> [];
-retry_line(Retry) -> [~"retry: ", integer_to_binary(Retry), $\n].
+retry_line(Retry) when is_integer(Retry), Retry >= 0 -> [~"retry: ", integer_to_binary(Retry), $\n];
+retry_line(_Retry) -> error({invalid_option, retry, not_a_non_negative_integer}).
 
 patch_elements_option_lines(Opts) ->
     [
@@ -242,7 +260,7 @@ patch_elements_option_lines(Opts) ->
     ].
 
 selector_line(undefined) -> [];
-selector_line(Sel) -> [~"data: selector ", Sel, $\n].
+selector_line(Sel) -> [~"data: selector ", single_line(selector, Sel), $\n].
 
 mode_line(outer) -> [];
 mode_line(inner) -> ~"data: mode inner\n";
@@ -252,7 +270,7 @@ mode_line(append) -> ~"data: mode append\n";
 mode_line(before) -> ~"data: mode before\n";
 mode_line('after') -> ~"data: mode after\n";
 mode_line(remove) -> ~"data: mode remove\n";
-mode_line(Mode) when is_binary(Mode) -> [~"data: mode ", Mode, $\n].
+mode_line(Mode) when is_binary(Mode) -> [~"data: mode ", single_line(mode, Mode), $\n].
 
 use_view_transition_line(false) -> [];
 use_view_transition_line(true) -> ~"data: useViewTransition true\n".
@@ -260,7 +278,17 @@ use_view_transition_line(true) -> ~"data: useViewTransition true\n".
 namespace_line(html) -> [];
 namespace_line(svg) -> ~"data: namespace svg\n";
 namespace_line(mathml) -> ~"data: namespace mathml\n";
-namespace_line(Ns) when is_binary(Ns) -> [~"data: namespace ", Ns, $\n].
+namespace_line(Ns) when is_binary(Ns) -> [~"data: namespace ", single_line(namespace, Ns), $\n].
+
+single_line(Option, Value) ->
+    Bin = iolist_to_binary(Value),
+    case binary:match(Bin, [~"\r", ~"\n", <<0>>]) of
+        nomatch -> Bin;
+        {Position, 1} -> error({invalid_option, Option, refused_byte(binary:at(Bin, Position))})
+    end.
+
+refused_byte(0) -> nul;
+refused_byte(_LineBreak) -> line_break.
 
 patch_signals_option_lines(Opts) ->
     case maps:get(only_if_missing, Opts, false) of
