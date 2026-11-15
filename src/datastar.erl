@@ -53,24 +53,24 @@ compile down to these two events as ergonomic sugar.
 -type namespace() :: html | svg | mathml | binary().
 
 -type patch_elements_opts() :: #{
-    selector => binary(),
+    selector => iodata(),
     mode => mode(),
     use_view_transition => boolean(),
     namespace => namespace(),
-    id => binary(),
+    id => iodata(),
     retry => non_neg_integer()
 }.
 
 -type patch_signals_opts() :: #{
     only_if_missing => boolean(),
-    id => binary(),
+    id => iodata(),
     retry => non_neg_integer()
 }.
 
 -type execute_script_opts() :: #{
     auto_remove => boolean(),
     attributes => [{binary(), binary()}],
-    id => binary(),
+    id => iodata(),
     retry => non_neg_integer()
 }.
 
